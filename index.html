@@ -67,10 +67,15 @@
 			const svgElement = document.getElementById("visualizerSvg");
 			const sequenceInput = document.getElementById("sequenceInput");
 
-			function createSvgElement(tag, attributes) {
+			function createSvgElement(tag, attributes, tooltip) {
 				const el = document.createElementNS(SVG_NS, tag);
 				for (const attr in attributes) {
 					el.setAttribute(attr, attributes[attr]);
+				}
+				if (tooltip) {
+					const title = document.createElementNS(SVG_NS, "title");
+					title.textContent = tooltip;
+					el.appendChild(title);
 				}
 				return el;
 			}
@@ -89,11 +94,17 @@
 				return (val) => SVG_PADDING_TOP + (val - minVal + MIN_Y_VALUE_OFFSET) * Y_SPACING_FACTOR;
 			}
 
+			// Helper function to determine if an arc is on the left or right side
+			// based on the index of its starting point in the sequence.
+			function getSide(arcStartingIndexInSequence) {
+				return arcStartingIndexInSequence % 2 === 0 ? "right" : "left";
+			}
+
 			function drawVisualization(sequence) {
 				svgElement.innerHTML = ""; // Clear previous SVG content
 
 				if (!sequence || sequence.length === 0) {
-					svgElement.setAttribute("height", SVG_PADDING_TOP + SVG_PADDING_BOTTOM + 50); // Default small height
+					svgElement.setAttribute("height", SVG_PADDING_TOP + SVG_PADDING_BOTTOM + 50);
 					svgElement.setAttribute("width", SVG_WIDTH);
 					return;
 				}
@@ -109,7 +120,6 @@
 					svgHeight = SVG_PADDING_TOP + SVG_PADDING_BOTTOM + 50;
 				}
 				if (sequence.length === 1 && yCoords.length > 0) {
-					// Check yCoords.length too
 					svgHeight = yCoords[0] + Y_SPACING_FACTOR + SVG_PADDING_BOTTOM;
 				}
 				svgHeight = Math.max(svgHeight, SVG_PADDING_TOP + SVG_PADDING_BOTTOM + 50);
@@ -117,11 +127,58 @@
 				svgElement.setAttribute("width", SVG_WIDTH);
 				svgElement.setAttribute("height", svgHeight);
 
+				// Create a group for filled regions, add it first so it's in the background
+				const fillsGroup = createSvgElement("g", {});
+				svgElement.appendChild(fillsGroup);
+
+				// Draw Region Fills
+				if (sequence.length >= 2) {
+					for (let i = 0; i < sequence.length - 1; i++) {
+						let { drawingPositions, drawingDirections } = generateRegionFilledPaths(sequence, sequence[i], sequence[i + 1]);
+						drawingPositions.push(drawingPositions[0]);
+						drawingDirections.push(drawingDirections[0]);
+						const intersectionCount = countIntersectionsForArc(sequence, sequence[i], sequence[i + 1]);
+						const fillColor =
+							{
+								2: "yellow",
+								3: "orange",
+								4: "red",
+							}[intersectionCount] || "darkgray";
+
+						let startY = mapY(drawingPositions[0]);
+						let closeDirection = drawingDirections[0];
+						let pathData = `M ${CENTER_X},${startY}`;
+						if (intersectionCount === 6 && i === 2) console.log(`drawingPositions[0]: ${drawingPositions[0]}, startY: ${startY}`);
+
+						for (let j = 1; j < drawingPositions.length; j++) {
+							const nextY = mapY(drawingPositions[j]);
+							if (intersectionCount === 6 && i === 2) console.log(`drawingPositions[${j}]: ${drawingPositions[j]}, nextY: ${nextY}`);
+							const direction = drawingDirections[j];
+
+							const directionFlag = (j === drawingPositions.length - 1) !== (direction === "right") ? 1 : 0;
+
+							if (direction === "down") pathData += ` L ${CENTER_X},${nextY}`;
+							else pathData += ` A 1,1 0 0,${directionFlag} ${CENTER_X},${nextY}`;
+						}
+
+						const fillPath = createSvgElement(
+							"path",
+							{
+								d: pathData,
+								fill: fillColor,
+								stroke: "none",
+							},
+							`${intersectionCount} corner region`
+						);
+						fillsGroup.appendChild(fillPath);
+					}
+				}
+
 				const lineTopY = SVG_PADDING_TOP / 2;
 				const lineBottomY = svgHeight - SVG_PADDING_BOTTOM / 2;
 
 				// Draw Centerline
-				const centerline = createSvgElement("line", {
+				const centerlineElement = createSvgElement("line", {
 					x1: CENTER_X,
 					y1: lineTopY,
 					x2: CENTER_X,
@@ -129,13 +186,13 @@
 					stroke: "black",
 					"stroke-width": 2,
 				});
-				svgElement.appendChild(centerline);
+				svgElement.appendChild(centerlineElement);
 
 				// Draw Top Centerline Arrowhead (downward-facing)
 				const topArrowPath = `
-			                 M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
-			                 L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
-			                 L ${CENTER_X},${lineTopY + CENTERLINE_ARROW_HEAD_SIZE_H}`;
+					M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
+					L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
+					L ${CENTER_X},${lineTopY + CENTERLINE_ARROW_HEAD_SIZE_H}`.trim();
 				const topArrow = createSvgElement("path", {
 					d: topArrowPath,
 					fill: "black",
@@ -144,9 +201,11 @@
 
 				// Draw Bottom Centerline Arrowhead (downward-facing)
 				const bottomArrowPath = `
-			                 M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
-			                 L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
-			                 L ${CENTER_X},${lineBottomY}`;
+					M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
+					L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
+					L ${CENTER_X},${lineBottomY}`
+					.replace(/\t+/g, " ")
+					.trim();
 				const bottomArrow = createSvgElement("path", {
 					d: bottomArrowPath,
 					fill: "black",
@@ -170,9 +229,11 @@
 
 				// Corrected startRiverArrowPath to point right (>)
 				const startRiverArrowPath = `
-			                 M ${startRiverX - RIVER_END_ARROW_SIZE},${firstY - RIVER_END_ARROW_SIZE}
-			                 L ${startRiverX},${firstY}
-			                 L ${startRiverX - RIVER_END_ARROW_SIZE},${firstY + RIVER_END_ARROW_SIZE}`;
+					M ${startRiverX - RIVER_END_ARROW_SIZE},${firstY - RIVER_END_ARROW_SIZE}
+					L ${startRiverX},${firstY}
+					L ${startRiverX - RIVER_END_ARROW_SIZE},${firstY + RIVER_END_ARROW_SIZE}`
+					.replace(/\t+/g, " ")
+					.trim();
 				const startRiverArrow = createSvgElement("path", {
 					d: startRiverArrowPath,
 					stroke: "black",
@@ -181,25 +242,28 @@
 				});
 				svgElement.appendChild(startRiverArrow);
 
-				// Draw Crossings and Arcs
+				// Draw crossings and arcs (river path)
 				for (let i = 0; i < sequence.length; i++) {
 					const yPos = mapY(sequence[i]);
 
 					// Draw Crossing Arrow
-					const isLeftToRight = i % 2 === 0; // River starts on left, 0th crossing is L->R
 					let crossingArrowPath;
-					if (isLeftToRight) {
+					if (getSide(i) === "right") {
 						// Points right (>)
 						crossingArrowPath = `
-			                         M ${CENTER_X - CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
-			                         L ${CENTER_X},${yPos}
-			                         L ${CENTER_X - CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+							M ${CENTER_X - CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
+							L ${CENTER_X},${yPos}
+							L ${CENTER_X - CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`
+							.replace(/\t+/g, " ")
+							.trim();
 					} else {
 						// Points left (<)
 						crossingArrowPath = `
-			                     M ${CENTER_X + CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
-			                     L ${CENTER_X},${yPos}
-			                     L ${CENTER_X + CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+							M ${CENTER_X + CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
+							L ${CENTER_X},${yPos}
+							L ${CENTER_X + CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`
+							.replace(/\t+/g, " ")
+							.trim();
 					}
 					const crossingArrow = createSvgElement("path", {
 						d: crossingArrowPath,
@@ -219,18 +283,20 @@
 						const arcRadius = Math.abs(yPos - prevYPos) / 2;
 						if (arcRadius === 0) continue;
 
-						const arcOnRightSide = (i - 1) % 2 === 0;
+						const arcSide = getSide(i - 1);
 
 						let sweepFlag;
-						if (arcOnRightSide) {
+						if (arcSide === "right") {
 							sweepFlag = yPos > prevYPos ? 1 : 0;
 						} else {
 							sweepFlag = yPos > prevYPos ? 0 : 1;
 						}
 
 						const arcPath = `
-			                         M ${CENTER_X},${prevYPos}
-			                         A ${arcRadius},${arcRadius} 0 0,${sweepFlag} ${CENTER_X},${yPos}`;
+							M ${CENTER_X},${prevYPos}
+							A ${arcRadius},${arcRadius} 0 0,${sweepFlag} ${CENTER_X},${yPos}`
+							.replace(/\t+/g, " ")
+							.trim();
 						const arc = createSvgElement("path", {
 							d: arcPath,
 							stroke: "dodgerblue",
@@ -244,21 +310,28 @@
 				if (sequence.length > 0) {
 					const lastY = mapY(sequence[sequence.length - 1]);
 					const lastCrossingIndex = sequence.length - 1;
-					const riverEndsOnRight = lastCrossingIndex % 2 === 0; // After L->R crossing, river is on right
+					// Side of the river after the last crossing: if last crossing L->R (index even), river is on right.
+					const riverEndsOnSide = getSide(lastCrossingIndex);
 
 					let endRiverX, endRiverArrowPath;
-					if (riverEndsOnRight) {
+					if (riverEndsOnSide === "right") {
+						// River is on the right side of centerline, arrow points right
 						endRiverX = CENTER_X + RIVER_END_EXTENSION_LENGTH;
 						endRiverArrowPath = `
-			                         M ${endRiverX - RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
-			                         L ${endRiverX},${lastY}
-			                         L ${endRiverX - RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+							M ${endRiverX - RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
+							L ${endRiverX},${lastY}
+							L ${endRiverX - RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`
+							.replace(/\t+/g, " ")
+							.trim();
 					} else {
+						// River is on the left side of centerline, arrow points left
 						endRiverX = CENTER_X - RIVER_END_EXTENSION_LENGTH;
 						endRiverArrowPath = `
-			                         M ${endRiverX + RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
-			                         L ${endRiverX},${lastY}
-			                         L ${endRiverX + RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+							M ${endRiverX + RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
+							L ${endRiverX},${lastY}
+							L ${endRiverX + RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`
+							.replace(/\t+/g, " ")
+							.trim();
 					}
 
 					// Draw End of River
@@ -296,7 +369,6 @@
 			// 				No -> continue the inner loop
 			function countIntersectionsForArc(sequence, outerBendA, outerBendB) {
 				const pairTopAndBottom = (a, b) => [Math.min(a, b), Math.max(a, b)];
-				const getSide = (index) => (index % 2 === 0 ? "right" : "left");
 
 				const bendPairs = sequence.slice(0, -1).map((_, i) => ({
 					a: sequence[i],
@@ -305,7 +377,7 @@
 				}));
 
 				const [outerBendTop, outerBendBottom] = pairTopAndBottom(outerBendA, outerBendB);
-				const outerIsLeft = bendPairs.find(({ a, b }) => {
+				const outerSide = bendPairs.find(({ a, b }) => {
 					const [top, bottom] = pairTopAndBottom(a, b);
 					return top === outerBendTop && bottom === outerBendBottom;
 				}).side;
@@ -319,7 +391,7 @@
 
 					if (position === outerBendBottom) break; // Reached the bottom of the bend
 
-					const nextBend = bendPairs.find(({ a, b, side }) => position === pairTopAndBottom(a, b)[0] && side === outerIsLeft);
+					const nextBend = bendPairs.find(({ a, b, side }) => position === pairTopAndBottom(a, b)[0] && side === outerSide);
 
 					if (nextBend) {
 						const [nextBendTop, nextBendBottom] = pairTopAndBottom(nextBend.a, nextBend.b);
@@ -329,6 +401,45 @@
 				}
 
 				return count;
+			}
+
+			function generateRegionFilledPaths(sequence, outerBendA, outerBendB) {
+				const pairTopAndBottom = (a, b) => [Math.min(a, b), Math.max(a, b)];
+
+				const bendPairs = sequence.slice(0, -1).map((_, i) => ({
+					a: sequence[i],
+					b: sequence[i + 1],
+					side: getSide(i),
+				}));
+
+				const [outerBendTop, outerBendBottom] = pairTopAndBottom(outerBendA, outerBendB);
+				const outerSide = bendPairs.find(({ a, b }) => {
+					const [top, bottom] = pairTopAndBottom(a, b);
+					return top === outerBendTop && bottom === outerBendBottom;
+				}).side;
+
+				let position = outerBendTop;
+				let drawingPositions = [outerBendTop];
+				let drawingDirections = [outerSide];
+
+				while (true) {
+					position += 1;
+					drawingPositions.push(position);
+					drawingDirections.push("down");
+
+					if (position === outerBendBottom) break; // Reached the bottom of the bend
+
+					const nextBend = bendPairs.find(({ a, b, side }) => position === pairTopAndBottom(a, b)[0] && side === outerSide);
+
+					if (nextBend) {
+						const [nextBendTop, nextBendBottom] = pairTopAndBottom(nextBend.a, nextBend.b);
+						position = nextBendBottom; // Follow the bend to its bottom
+						drawingPositions.push(position);
+						drawingDirections.push(nextBend.side); // Count the bend
+					}
+				}
+
+				return { drawingPositions, drawingDirections };
 			}
 
 			function displayIntersectionCounts(sequence) {
@@ -345,7 +456,7 @@
 					if (yPrev === yCurr) continue;
 
 					const count = countIntersectionsForArc(sequence, yPrev, yCurr);
-					const side = (i - 1) % 2 === 0 ? "right" : "left";
+					const side = getSide(i - 1);
 
 					const li = document.createElement("li");
 					li.textContent = `${count} corners: ${side} side bend from ${yPrev} to ${yCurr}`;
