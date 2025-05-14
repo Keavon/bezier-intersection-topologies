@@ -21,20 +21,37 @@
 				width: 300px;
 				padding: 8px;
 				font-size: 16px;
-				margin-top: 10px;
+				box-sizing: border-box;
 			}
 			label {
 				margin-top: 20px;
+			}
+			#intersectionCountsContainer {
+				width: 80%;
+				max-width: 300px;
+				text-align: left;
+			}
+			#intersectionCountsContainer ul {
+				list-style-type: none;
+				padding-left: 0;
+			}
+			#intersectionCountsContainer li {
+				background-color: #f9f9f9;
+				border: 1px solid #eee;
+				padding: 8px;
+				margin-bottom: 5px;
+				font-size: 14px;
 			}
 		</style>
 	</head>
 	<body>
 		<svg id="visualizerSvg"></svg>
 		<input type="text" id="sequenceInput" placeholder="3 2 1 6 5 4 9 8 7" />
+		<div id="intersectionCountsContainer"></div>
 
 		<script>
 			const SVG_NS = "http://www.w3.org/2000/svg";
-			const SVG_WIDTH = 400;
+			const SVG_WIDTH = 300;
 			const SVG_PADDING_TOP = 40;
 			const SVG_PADDING_BOTTOM = 40;
 			const CENTER_X = SVG_WIDTH / 2;
@@ -116,9 +133,9 @@
 
 				// Draw Top Centerline Arrowhead (downward-facing)
 				const topArrowPath = `
-					M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
-					L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
-					L ${CENTER_X},${lineTopY + CENTERLINE_ARROW_HEAD_SIZE_H}`;
+			                 M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
+			                 L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
+			                 L ${CENTER_X},${lineTopY + CENTERLINE_ARROW_HEAD_SIZE_H}`;
 				const topArrow = createSvgElement("path", {
 					d: topArrowPath,
 					fill: "black",
@@ -127,9 +144,9 @@
 
 				// Draw Bottom Centerline Arrowhead (downward-facing)
 				const bottomArrowPath = `
-					M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
-					L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
-					L ${CENTER_X},${lineBottomY}`;
+			                 M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
+			                 L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
+			                 L ${CENTER_X},${lineBottomY}`;
 				const bottomArrow = createSvgElement("path", {
 					d: bottomArrowPath,
 					fill: "black",
@@ -153,9 +170,9 @@
 
 				// Corrected startRiverArrowPath to point right (>)
 				const startRiverArrowPath = `
-					M ${startRiverX - RIVER_END_ARROW_SIZE},${firstY - RIVER_END_ARROW_SIZE}
-					L ${startRiverX},${firstY}
-					L ${startRiverX - RIVER_END_ARROW_SIZE},${firstY + RIVER_END_ARROW_SIZE}`;
+			                 M ${startRiverX - RIVER_END_ARROW_SIZE},${firstY - RIVER_END_ARROW_SIZE}
+			                 L ${startRiverX},${firstY}
+			                 L ${startRiverX - RIVER_END_ARROW_SIZE},${firstY + RIVER_END_ARROW_SIZE}`;
 				const startRiverArrow = createSvgElement("path", {
 					d: startRiverArrowPath,
 					stroke: "black",
@@ -174,15 +191,15 @@
 					if (isLeftToRight) {
 						// Points right (>)
 						crossingArrowPath = `
-							M ${CENTER_X - CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
-							L ${CENTER_X},${yPos}
-							L ${CENTER_X - CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+			                         M ${CENTER_X - CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
+			                         L ${CENTER_X},${yPos}
+			                         L ${CENTER_X - CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
 					} else {
 						// Points left (<)
 						crossingArrowPath = `
-						M ${CENTER_X + CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
-						L ${CENTER_X},${yPos}
-						L ${CENTER_X + CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+			                     M ${CENTER_X + CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
+			                     L ${CENTER_X},${yPos}
+			                     L ${CENTER_X + CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
 					}
 					const crossingArrow = createSvgElement("path", {
 						d: crossingArrowPath,
@@ -212,8 +229,8 @@
 						}
 
 						const arcPath = `
-							M ${CENTER_X},${prevYPos}
-							A ${arcRadius},${arcRadius} 0 0,${sweepFlag} ${CENTER_X},${yPos}`;
+			                         M ${CENTER_X},${prevYPos}
+			                         A ${arcRadius},${arcRadius} 0 0,${sweepFlag} ${CENTER_X},${yPos}`;
 						const arc = createSvgElement("path", {
 							d: arcPath,
 							stroke: "dodgerblue",
@@ -233,15 +250,15 @@
 					if (riverEndsOnRight) {
 						endRiverX = CENTER_X + RIVER_END_EXTENSION_LENGTH;
 						endRiverArrowPath = `
-						M ${endRiverX - RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
-						L ${endRiverX},${lastY}
-						L ${endRiverX - RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+			                         M ${endRiverX - RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
+			                         L ${endRiverX},${lastY}
+			                         L ${endRiverX - RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
 					} else {
 						endRiverX = CENTER_X - RIVER_END_EXTENSION_LENGTH;
 						endRiverArrowPath = `
-                            M ${endRiverX + RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
-                            L ${endRiverX},${lastY}
-                            L ${endRiverX + RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+			                         M ${endRiverX + RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
+			                         L ${endRiverX},${lastY}
+			                         L ${endRiverX + RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
 					}
 
 					// Draw End of River
@@ -266,10 +283,87 @@
 				}
 			}
 
+			// Procedure to count intersections bounding a sub-region surrounded by the road and river bends
+			// For every bend:
+			// 	Position = top of the bend
+			// 	Counter = 1
+			// 	Loop until done:
+			// 		Travel 1 down the road and add 1
+			// 		Are we at the bottom of our bend?
+			// 			Yes -> exit to continue on to the next bend
+			// 			No -> Are we at the top of another bend on our same side?
+			// 				Yes -> follow it, add 1, then continue the inner loop
+			// 				No -> continue the inner loop
+			function countIntersectionsForArc(sequence, outerBendA, outerBendB) {
+				const pairTopAndBottom = (a, b) => [Math.min(a, b), Math.max(a, b)];
+				const getSide = (index) => (index % 2 === 0 ? "right" : "left");
+
+				const bendPairs = sequence.slice(0, -1).map((_, i) => ({
+					a: sequence[i],
+					b: sequence[i + 1],
+					side: getSide(i),
+				}));
+
+				const [outerBendTop, outerBendBottom] = pairTopAndBottom(outerBendA, outerBendB);
+				const outerIsLeft = bendPairs.find(({ a, b }) => {
+					const [top, bottom] = pairTopAndBottom(a, b);
+					return top === outerBendTop && bottom === outerBendBottom;
+				}).side;
+
+				let position = outerBendTop;
+				let count = 1;
+
+				while (true) {
+					position += 1;
+					count += 1;
+
+					if (position === outerBendBottom) break; // Reached the bottom of the bend
+
+					const nextBend = bendPairs.find(({ a, b, side }) => position === pairTopAndBottom(a, b)[0] && side === outerIsLeft);
+
+					if (nextBend) {
+						const [nextBendTop, nextBendBottom] = pairTopAndBottom(nextBend.a, nextBend.b);
+						count += 1; // Count the bend
+						position = nextBendBottom; // Follow the bend to its bottom
+					}
+				}
+
+				return count;
+			}
+
+			function displayIntersectionCounts(sequence) {
+				const countsElement = document.getElementById("intersectionCountsContainer");
+				countsElement.innerHTML = "";
+
+				if (!sequence || sequence.length < 2) return;
+
+				const bendList = [];
+
+				for (let i = 1; i < sequence.length; i++) {
+					const yPrev = sequence[i - 1];
+					const yCurr = sequence[i];
+					if (yPrev === yCurr) continue;
+
+					const count = countIntersectionsForArc(sequence, yPrev, yCurr);
+					const side = (i - 1) % 2 === 0 ? "right" : "left";
+
+					const li = document.createElement("li");
+					li.textContent = `${count} corners: ${side} side bend from ${yPrev} to ${yCurr}`;
+					bendList.push(li);
+				}
+
+				if (bendList.length > 0) {
+					const ul = document.createElement("ul");
+					bendList.forEach((li) => ul.appendChild(li));
+					countsElement.appendChild(ul);
+				}
+			}
+
 			function handleInputChange() {
 				const sequenceText = sequenceInput.value;
 				const sequence = parseSequence(sequenceText);
 				drawVisualization(sequence);
+				displayIntersectionCounts(sequence);
 			}
 
 			sequenceInput.addEventListener("input", handleInputChange);
