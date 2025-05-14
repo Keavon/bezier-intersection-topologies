@@ -66,6 +66,12 @@
 					.filter((num) => !isNaN(num));
 			}
 
+			function getMapYForSequence(currentSequence) {
+				if (!currentSequence || currentSequence.length === 0) return (val) => val;
+				const minVal = Math.min(...currentSequence);
+				return (val) => SVG_PADDING_TOP + (val - minVal + MIN_Y_VALUE_OFFSET) * Y_SPACING_FACTOR;
+			}
+
 			function drawVisualization(sequence) {
 				svgElement.innerHTML = ""; // Clear previous SVG content
 
@@ -75,14 +81,21 @@
 					return;
 				}
 
-				const minVal = Math.min(...sequence);
-				const maxVal = Math.max(...sequence);
+				const mapY = getMapYForSequence(sequence);
+				const yCoords = sequence.map(mapY);
 
-				// Adjust Y mapping to ensure smallest value is not at the very top
-				// and largest value determines the height.
-				const mapY = (val) => SVG_PADDING_TOP + (val - minVal + MIN_Y_VALUE_OFFSET) * Y_SPACING_FACTOR;
-
-				const svgHeight = SVG_PADDING_TOP + (maxVal - minVal + MIN_Y_VALUE_OFFSET + 1) * Y_SPACING_FACTOR + SVG_PADDING_BOTTOM;
+				let svgHeight;
+				if (yCoords.length > 0) {
+					const maxYMapped = Math.max(...yCoords);
+					svgHeight = maxYMapped + Y_SPACING_FACTOR + SVG_PADDING_BOTTOM;
+				} else {
+					svgHeight = SVG_PADDING_TOP + SVG_PADDING_BOTTOM + 50;
+				}
+				if (sequence.length === 1 && yCoords.length > 0) {
+					// Check yCoords.length too
+					svgHeight = yCoords[0] + Y_SPACING_FACTOR + SVG_PADDING_BOTTOM;
+				}
+				svgHeight = Math.max(svgHeight, SVG_PADDING_TOP + SVG_PADDING_BOTTOM + 50);
 
 				svgElement.setAttribute("width", SVG_WIDTH);
 				svgElement.setAttribute("height", svgHeight);
@@ -123,6 +136,8 @@
 				});
 				svgElement.appendChild(bottomArrow);
 
+				if (sequence.length === 0) return;
+
 				// Draw Start of River
 				const firstY = mapY(sequence[0]);
 				const startRiverX = CENTER_X - RIVER_END_EXTENSION_LENGTH;
@@ -136,6 +151,7 @@
 				});
 				svgElement.appendChild(startRiverLine);
 
+				// Corrected startRiverArrowPath to point right (>)
 				const startRiverArrowPath = `
 					M ${startRiverX - RIVER_END_ARROW_SIZE},${firstY - RIVER_END_ARROW_SIZE}
 					L ${startRiverX},${firstY}
@@ -150,8 +166,7 @@
 
 				// Draw Crossings and Arcs
 				for (let i = 0; i < sequence.length; i++) {
-					const currentVal = sequence[i];
-					const yPos = mapY(currentVal);
+					const yPos = mapY(sequence[i]);
 
 					// Draw Crossing Arrow
 					const isLeftToRight = i % 2 === 0; // River starts on left, 0th crossing is L->R
@@ -209,31 +224,27 @@
 					}
 				}
 
-				// Draw End of River
-				const lastY = mapY(sequence[sequence.length - 1]);
-				const lastCrossingIndex = sequence.length - 1;
-				const riverEndsOnRight = lastCrossingIndex % 2 === 0; // After L->R crossing, river is on right
+				if (sequence.length > 0) {
+					const lastY = mapY(sequence[sequence.length - 1]);
+					const lastCrossingIndex = sequence.length - 1;
+					const riverEndsOnRight = lastCrossingIndex % 2 === 0; // After L->R crossing, river is on right
 
-				let endRiverX, endRiverArrowPath;
-				if (riverEndsOnRight) {
-					endRiverX = CENTER_X + RIVER_END_EXTENSION_LENGTH;
-					const endRiverLine = createSvgElement("line", {
-						x1: CENTER_X,
-						y1: lastY,
-						x2: endRiverX,
-						y2: lastY,
-						stroke: "dodgerblue",
-						"stroke-width": 2,
-					});
-					svgElement.appendChild(endRiverLine);
-					// Arrow points right: <
-					endRiverArrowPath = `
+					let endRiverX, endRiverArrowPath;
+					if (riverEndsOnRight) {
+						endRiverX = CENTER_X + RIVER_END_EXTENSION_LENGTH;
+						endRiverArrowPath = `
 						M ${endRiverX - RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
 						L ${endRiverX},${lastY}
 						L ${endRiverX - RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
-				} else {
-					// River ends on Left
-					endRiverX = CENTER_X - RIVER_END_EXTENSION_LENGTH;
+					} else {
+						endRiverX = CENTER_X - RIVER_END_EXTENSION_LENGTH;
+						endRiverArrowPath = `
+                            M ${endRiverX + RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
+                            L ${endRiverX},${lastY}
+                            L ${endRiverX + RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+					}
+
+					// Draw End of River
 					const endRiverLine = createSvgElement("line", {
 						x1: CENTER_X,
 						y1: lastY,
@@ -243,19 +254,16 @@
 						"stroke-width": 2,
 					});
 					svgElement.appendChild(endRiverLine);
-					// Arrow points left: >
-					endRiverArrowPath = `
-						M ${endRiverX + RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
-						L ${endRiverX},${lastY}
-						L ${endRiverX + RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+
+					// Draw End of River Arrow
+					const endRiverArrow = createSvgElement("path", {
+						d: endRiverArrowPath,
+						stroke: "black",
+						"stroke-width": 2,
+						fill: "none",
+					});
+					svgElement.appendChild(endRiverArrow);
 				}
-				const endRiverArrow = createSvgElement("path", {
-					d: endRiverArrowPath,
-					stroke: "black",
-					"stroke-width": 2,
-					fill: "none",
-				});
-				svgElement.appendChild(endRiverArrow);
 			}
 
 			function handleInputChange() {
@@ -266,7 +274,6 @@
 
 			sequenceInput.addEventListener("input", handleInputChange);
 
-			// Initial draw with placeholder or default
 			sequenceInput.value = "3 2 1 6 5 4 9 8 7";
 			handleInputChange();
 		</script>
