@@ -30,8 +30,7 @@
 	</head>
 	<body>
 		<svg id="visualizerSvg"></svg>
-		<label for="sequenceInput">Enter sequence (space-separated numbers):</label>
-		<input type="text" id="sequenceInput" placeholder="e.g., 3 2 1 6 5 4 9 8 7" />
+		<input type="text" id="sequenceInput" placeholder="3 2 1 6 5 4 9 8 7" />
 
 		<script>
 			const SVG_NS = "http://www.w3.org/2000/svg";
@@ -42,9 +41,11 @@
 			const Y_SPACING_FACTOR = 25; // Pixels per unit difference in sequence value
 			const MIN_Y_VALUE_OFFSET = 1; // Additional spacing for the smallest value from the top
 
-			const CENTERLINE_ARROW_HEAD_SIZE_W = 16;
-			const CENTERLINE_ARROW_HEAD_SIZE_H = 12;
+			const CENTERLINE_ARROW_HEAD_SIZE_W = 14;
+			const CENTERLINE_ARROW_HEAD_SIZE_H = 10;
 			const CROSSING_ARROW_SIZE = 7;
+			const RIVER_END_EXTENSION_LENGTH = 60;
+			const RIVER_END_ARROW_SIZE = 6;
 
 			const svgElement = document.getElementById("visualizerSvg");
 			const sequenceInput = document.getElementById("sequenceInput");
@@ -101,9 +102,10 @@
 				svgElement.appendChild(centerline);
 
 				// Draw Top Centerline Arrowhead (downward-facing)
-				const topArrowPath = `M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY} 
-                                L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY} 
-                                L ${CENTER_X},${lineTopY + CENTERLINE_ARROW_HEAD_SIZE_H}`;
+				const topArrowPath = `
+					M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
+					L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY}
+					L ${CENTER_X},${lineTopY + CENTERLINE_ARROW_HEAD_SIZE_H}`;
 				const topArrow = createSvgElement("path", {
 					d: topArrowPath,
 					fill: "black",
@@ -111,14 +113,40 @@
 				svgElement.appendChild(topArrow);
 
 				// Draw Bottom Centerline Arrowhead (downward-facing)
-				const bottomArrowPath = `M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H} 
-                                   L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H} 
-                                   L ${CENTER_X},${lineBottomY}`;
+				const bottomArrowPath = `
+					M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
+					L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H}
+					L ${CENTER_X},${lineBottomY}`;
 				const bottomArrow = createSvgElement("path", {
 					d: bottomArrowPath,
 					fill: "black",
 				});
 				svgElement.appendChild(bottomArrow);
+
+				// Draw Start of River
+				const firstY = mapY(sequence[0]);
+				const startRiverX = CENTER_X - RIVER_END_EXTENSION_LENGTH;
+				const startRiverLine = createSvgElement("line", {
+					x1: startRiverX,
+					y1: firstY,
+					x2: CENTER_X,
+					y2: firstY,
+					stroke: "dodgerblue",
+					"stroke-width": 2,
+				});
+				svgElement.appendChild(startRiverLine);
+
+				const startRiverArrowPath = `
+					M ${startRiverX - RIVER_END_ARROW_SIZE},${firstY - RIVER_END_ARROW_SIZE}
+					L ${startRiverX},${firstY}
+					L ${startRiverX - RIVER_END_ARROW_SIZE},${firstY + RIVER_END_ARROW_SIZE}`;
+				const startRiverArrow = createSvgElement("path", {
+					d: startRiverArrowPath,
+					stroke: "black",
+					"stroke-width": 2,
+					fill: "none",
+				});
+				svgElement.appendChild(startRiverArrow);
 
 				// Draw Crossings and Arcs
 				for (let i = 0; i < sequence.length; i++) {
@@ -130,14 +158,16 @@
 					let crossingArrowPath;
 					if (isLeftToRight) {
 						// Points right (>)
-						crossingArrowPath = `M ${CENTER_X - CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE} 
-                                       L ${CENTER_X},${yPos} 
-                                       L ${CENTER_X - CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+						crossingArrowPath = `
+							M ${CENTER_X - CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
+							L ${CENTER_X},${yPos}
+							L ${CENTER_X - CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
 					} else {
 						// Points left (<)
-						crossingArrowPath = `M ${CENTER_X + CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE} 
-                                       L ${CENTER_X},${yPos} 
-                                       L ${CENTER_X + CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+						crossingArrowPath = `
+						M ${CENTER_X + CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE}
+						L ${CENTER_X},${yPos}
+						L ${CENTER_X + CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
 					}
 					const crossingArrow = createSvgElement("path", {
 						d: crossingArrowPath,
@@ -157,19 +187,18 @@
 						const arcRadius = Math.abs(yPos - prevYPos) / 2;
 						if (arcRadius === 0) continue;
 
-						// Arc is on the side the river *was* on before this segment's start
-						const arcOnRightSide = (i - 1) % 2 === 0; // After (i-1)th crossing: if L->R, river is on Right.
+						const arcOnRightSide = (i - 1) % 2 === 0;
 
 						let sweepFlag;
 						if (arcOnRightSide) {
 							sweepFlag = yPos > prevYPos ? 1 : 0;
 						} else {
-							// Arc on Left Side
 							sweepFlag = yPos > prevYPos ? 0 : 1;
 						}
 
-						const arcPath = `M ${CENTER_X},${prevYPos} 
-                                   A ${arcRadius},${arcRadius} 0 0,${sweepFlag} ${CENTER_X},${yPos}`;
+						const arcPath = `
+							M ${CENTER_X},${prevYPos}
+							A ${arcRadius},${arcRadius} 0 0,${sweepFlag} ${CENTER_X},${yPos}`;
 						const arc = createSvgElement("path", {
 							d: arcPath,
 							stroke: "dodgerblue",
@@ -179,6 +208,54 @@
 						svgElement.appendChild(arc);
 					}
 				}
+
+				// Draw End of River
+				const lastY = mapY(sequence[sequence.length - 1]);
+				const lastCrossingIndex = sequence.length - 1;
+				const riverEndsOnRight = lastCrossingIndex % 2 === 0; // After L->R crossing, river is on right
+
+				let endRiverX, endRiverArrowPath;
+				if (riverEndsOnRight) {
+					endRiverX = CENTER_X + RIVER_END_EXTENSION_LENGTH;
+					const endRiverLine = createSvgElement("line", {
+						x1: CENTER_X,
+						y1: lastY,
+						x2: endRiverX,
+						y2: lastY,
+						stroke: "dodgerblue",
+						"stroke-width": 2,
+					});
+					svgElement.appendChild(endRiverLine);
+					// Arrow points right: <
+					endRiverArrowPath = `
+						M ${endRiverX - RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
+						L ${endRiverX},${lastY}
+						L ${endRiverX - RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+				} else {
+					// River ends on Left
+					endRiverX = CENTER_X - RIVER_END_EXTENSION_LENGTH;
+					const endRiverLine = createSvgElement("line", {
+						x1: CENTER_X,
+						y1: lastY,
+						x2: endRiverX,
+						y2: lastY,
+						stroke: "dodgerblue",
+						"stroke-width": 2,
+					});
+					svgElement.appendChild(endRiverLine);
+					// Arrow points left: >
+					endRiverArrowPath = `
+						M ${endRiverX + RIVER_END_ARROW_SIZE},${lastY - RIVER_END_ARROW_SIZE}
+						L ${endRiverX},${lastY}
+						L ${endRiverX + RIVER_END_ARROW_SIZE},${lastY + RIVER_END_ARROW_SIZE}`;
+				}
+				const endRiverArrow = createSvgElement("path", {
+					d: endRiverArrowPath,
+					stroke: "black",
+					"stroke-width": 2,
+					fill: "none",
+				});
+				svgElement.appendChild(endRiverArrow);
 			}
 
 			function handleInputChange() {
