@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Stamp Folding Visualizer</title>
+		<style>
+			body {
+				font-family: sans-serif;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				margin: 20px;
+			}
+			#visualizerSvg {
+				border: 1px solid #ccc;
+				margin-bottom: 20px;
+				display: block; /* Prevents extra space below SVG */
+			}
+			#sequenceInput {
+				width: 300px;
+				padding: 8px;
+				font-size: 16px;
+				margin-top: 10px;
+			}
+			label {
+				margin-top: 20px;
+			}
+		</style>
+	</head>
+	<body>
+		<svg id="visualizerSvg"></svg>
+		<label for="sequenceInput">Enter sequence (space-separated numbers):</label>
+		<input type="text" id="sequenceInput" placeholder="e.g., 3 2 1 6 5 4 9 8 7" />
+
+		<script>
+			const SVG_NS = "http://www.w3.org/2000/svg";
+			const SVG_WIDTH = 400;
+			const SVG_PADDING_TOP = 40;
+			const SVG_PADDING_BOTTOM = 40;
+			const CENTER_X = SVG_WIDTH / 2;
+			const Y_SPACING_FACTOR = 25; // Pixels per unit difference in sequence value
+			const MIN_Y_VALUE_OFFSET = 1; // Additional spacing for the smallest value from the top
+
+			const CENTERLINE_ARROW_HEAD_SIZE_W = 16;
+			const CENTERLINE_ARROW_HEAD_SIZE_H = 12;
+			const CROSSING_ARROW_SIZE = 7;
+
+			const svgElement = document.getElementById("visualizerSvg");
+			const sequenceInput = document.getElementById("sequenceInput");
+
+			function createSvgElement(tag, attributes) {
+				const el = document.createElementNS(SVG_NS, tag);
+				for (const attr in attributes) {
+					el.setAttribute(attr, attributes[attr]);
+				}
+				return el;
+			}
+
+			function parseSequence(text) {
+				return text
+					.trim()
+					.split(/\s+/)
+					.map((numStr) => parseInt(numStr, 10))
+					.filter((num) => !isNaN(num));
+			}
+
+			function drawVisualization(sequence) {
+				svgElement.innerHTML = ""; // Clear previous SVG content
+
+				if (!sequence || sequence.length === 0) {
+					svgElement.setAttribute("height", SVG_PADDING_TOP + SVG_PADDING_BOTTOM + 50); // Default small height
+					svgElement.setAttribute("width", SVG_WIDTH);
+					return;
+				}
+
+				const minVal = Math.min(...sequence);
+				const maxVal = Math.max(...sequence);
+
+				// Adjust Y mapping to ensure smallest value is not at the very top
+				// and largest value determines the height.
+				const mapY = (val) => SVG_PADDING_TOP + (val - minVal + MIN_Y_VALUE_OFFSET) * Y_SPACING_FACTOR;
+
+				const svgHeight = SVG_PADDING_TOP + (maxVal - minVal + MIN_Y_VALUE_OFFSET + 1) * Y_SPACING_FACTOR + SVG_PADDING_BOTTOM;
+
+				svgElement.setAttribute("width", SVG_WIDTH);
+				svgElement.setAttribute("height", svgHeight);
+
+				const lineTopY = SVG_PADDING_TOP / 2;
+				const lineBottomY = svgHeight - SVG_PADDING_BOTTOM / 2;
+
+				// Draw Centerline
+				const centerline = createSvgElement("line", {
+					x1: CENTER_X,
+					y1: lineTopY,
+					x2: CENTER_X,
+					y2: lineBottomY,
+					stroke: "black",
+					"stroke-width": 2,
+				});
+				svgElement.appendChild(centerline);
+
+				// Draw Top Centerline Arrowhead (downward-facing)
+				const topArrowPath = `M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY} 
+                                L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineTopY} 
+                                L ${CENTER_X},${lineTopY + CENTERLINE_ARROW_HEAD_SIZE_H}`;
+				const topArrow = createSvgElement("path", {
+					d: topArrowPath,
+					fill: "black",
+				});
+				svgElement.appendChild(topArrow);
+
+				// Draw Bottom Centerline Arrowhead (downward-facing)
+				const bottomArrowPath = `M ${CENTER_X - CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H} 
+                                   L ${CENTER_X + CENTERLINE_ARROW_HEAD_SIZE_W / 2},${lineBottomY - CENTERLINE_ARROW_HEAD_SIZE_H} 
+                                   L ${CENTER_X},${lineBottomY}`;
+				const bottomArrow = createSvgElement("path", {
+					d: bottomArrowPath,
+					fill: "black",
+				});
+				svgElement.appendChild(bottomArrow);
+
+				// Draw Crossings and Arcs
+				for (let i = 0; i < sequence.length; i++) {
+					const currentVal = sequence[i];
+					const yPos = mapY(currentVal);
+
+					// Draw Crossing Arrow
+					const isLeftToRight = i % 2 === 0; // River starts on left, 0th crossing is L->R
+					let crossingArrowPath;
+					if (isLeftToRight) {
+						// Points right (>)
+						crossingArrowPath = `M ${CENTER_X - CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE} 
+                                       L ${CENTER_X},${yPos} 
+                                       L ${CENTER_X - CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+					} else {
+						// Points left (<)
+						crossingArrowPath = `M ${CENTER_X + CROSSING_ARROW_SIZE},${yPos - CROSSING_ARROW_SIZE} 
+                                       L ${CENTER_X},${yPos} 
+                                       L ${CENTER_X + CROSSING_ARROW_SIZE},${yPos + CROSSING_ARROW_SIZE}`;
+					}
+					const crossingArrow = createSvgElement("path", {
+						d: crossingArrowPath,
+						stroke: "black",
+						"stroke-width": 1.5,
+						fill: "none",
+					});
+					svgElement.appendChild(crossingArrow);
+
+					// Draw Arc to previous point
+					if (i > 0) {
+						const prevVal = sequence[i - 1];
+						const prevYPos = mapY(prevVal);
+
+						if (prevYPos === yPos) continue; // Skip arc if no vertical distance
+
+						const arcRadius = Math.abs(yPos - prevYPos) / 2;
+						if (arcRadius === 0) continue;
+
+						// Arc is on the side the river *was* on before this segment's start
+						const arcOnRightSide = (i - 1) % 2 === 0; // After (i-1)th crossing: if L->R, river is on Right.
+
+						let sweepFlag;
+						if (arcOnRightSide) {
+							sweepFlag = yPos > prevYPos ? 1 : 0;
+						} else {
+							// Arc on Left Side
+							sweepFlag = yPos > prevYPos ? 0 : 1;
+						}
+
+						const arcPath = `M ${CENTER_X},${prevYPos} 
+                                   A ${arcRadius},${arcRadius} 0 0,${sweepFlag} ${CENTER_X},${yPos}`;
+						const arc = createSvgElement("path", {
+							d: arcPath,
+							stroke: "dodgerblue",
+							"stroke-width": 2,
+							fill: "none",
+						});
+						svgElement.appendChild(arc);
+					}
+				}
+			}
+
+			function handleInputChange() {
+				const sequenceText = sequenceInput.value;
+				const sequence = parseSequence(sequenceText);
+				drawVisualization(sequence);
+			}
+
+			sequenceInput.addEventListener("input", handleInputChange);
+
+			// Initial draw with placeholder or default
+			sequenceInput.value = "3 2 1 6 5 4 9 8 7";
+			handleInputChange();
+		</script>
+	</body>
+</html>
