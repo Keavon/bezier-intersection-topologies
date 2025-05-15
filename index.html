@@ -13,7 +13,7 @@
 				margin: 20px;
 			}
 			#sequenceInput {
-				width: 400px;
+				width: 600px;
 				resize: vertical;
 				height: 100px;
 				padding: 8px;
@@ -47,7 +47,8 @@
 				display: block; /* Prevents extra space below SVG */
 			}
 			table {
-				width: 400px;
+				width: 600px;
+				margin-bottom: 10px;
 			}
 			input[type="checkbox"] {
 				margin-left: 0;
@@ -57,7 +58,19 @@
 	<body>
 		<table>
 			<tr>
-				<td>Semi-Meanders</td>
+				<td>Stamp Foldings (both ends may be trapped)</td>
+				<td><button onclick="loadSequence('stamp-foldings', 1)">1</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 2)">2</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 3)">3</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 4)">4</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 5)">5</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 6)">6</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 7)">7</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 8)">8</button></td>
+				<td><button onclick="loadSequence('stamp-foldings', 9)">9</button></td>
+			</tr>
+			<tr>
+				<td>Semi-Meanders (one end may be trapped)</td>
 				<td><button onclick="loadSequence('semi-meanders', 1)">1</button></td>
 				<td><button onclick="loadSequence('semi-meanders', 2)">2</button></td>
 				<td><button onclick="loadSequence('semi-meanders', 3)">3</button></td>
@@ -69,7 +82,7 @@
 				<td><button onclick="loadSequence('semi-meanders', 9)">9</button></td>
 			</tr>
 			<tr>
-				<td>Open Meanders</td>
+				<td>Open Meanders (no ends may be trapped)</td>
 				<td><button onclick="loadSequence('open-meanders', 1)">1</button></td>
 				<td><button onclick="loadSequence('open-meanders', 2)">2</button></td>
 				<td><button onclick="loadSequence('open-meanders', 3)">3</button></td>
@@ -80,20 +93,12 @@
 				<td><button onclick="loadSequence('open-meanders', 8)">8</button></td>
 				<td><button onclick="loadSequence('open-meanders', 9)">9</button></td>
 			</tr>
-			<tr>
-				<td><label for="only-symmetric">Only Symmetric</label></td>
-				<td><input id="only-symmetric" type="checkbox" /></td>
-			</tr>
 		</table>
 		<textarea id="sequenceInput"></textarea>
+		<p id="information"></p>
 		<div id="visualizationsContainer"></div>
 
 		<script>
-			const INTERSECTIONS = 9;
-			const ONLY_OPEN_MEANDERS = false;
-			const ONLY_SYMMETRIC = false;
-			const PRELOAD_CASES = `${ONLY_SYMMETRIC ? "symmetric-" : ""}${ONLY_OPEN_MEANDERS ? "open" : "semi"}-meanders/${INTERSECTIONS}.txt`;
-
 			const SVG_NS = "http://www.w3.org/2000/svg";
 			const SVG_WIDTH = 200;
 			const SVG_PADDING_TOP = 40;
@@ -102,6 +107,7 @@
 			const Y_SPACING_FACTOR = 25; // Pixels per unit difference in sequence value
 			const MIN_Y_VALUE_OFFSET = 1; // Additional spacing for the smallest value from the top
 
+			const PRELOAD_CASES = `stamp-foldings/9.txt`;
 			const CENTERLINE_ARROW_HEAD_SIZE_W = 14;
 			const CENTERLINE_ARROW_HEAD_SIZE_H = 10;
 			const CROSSING_ARROW_SIZE = 7;
@@ -509,9 +515,7 @@
 			}
 
 			function loadSequence(type, number) {
-				const symmetric = document.getElementById("only-symmetric").checked ? "symmetric-" : "";
-
-				fetch(`${symmetric}${type}/${number}.txt`)
+				fetch(`${type}/${number}.txt`)
 					.then((response) => response.text())
 					.then((text) => {
 						sequenceInput.value = text
@@ -590,6 +594,9 @@
 					vizItemContainer.appendChild(currentSvgElement);
 					visualizationsContainer.appendChild(vizItemContainer);
 				}
+
+				const informationElement = document.getElementById("information");
+				informationElement.innerText = `${visualizationsContainer.childElementCount} unfiltered unique ${visualizationsContainer.childElementCount === 1 ? "topology" : "topologies"}`;
 			}
 
 			sequenceInput.addEventListener("input", handleInputChange);
