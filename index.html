@@ -458,6 +458,20 @@
 				return { drawingPositions, drawingDirections };
 			}
 
+			function countVerticalDirectionChanges(sequence) {
+				let count = 0;
+				let lastDirection = undefined;
+				sequence
+					.slice(0, -1)
+					.map((_, i) => [sequence[i], sequence[i + 1]])
+					.forEach(([a, b]) => {
+						const currentDirection = a < b;
+						if (currentDirection !== lastDirection && lastDirection !== undefined) count += 1;
+						lastDirection = currentDirection;
+					});
+				return count;
+			}
+
 			function handleInputChange() {
 				const allSequencesText = sequenceInput.value;
 				const sequenceLines = allSequencesText.split("\n");
@@ -492,6 +506,7 @@
 					if (intersectionCountBuckets.find((value) => value > 4)) continue; // Any bucket with more than 4 of the same number of corners
 					if (entries.flatMap(([key, value]) => (key > 4 ? value : 0)).reduce((a, b) => a + b, 0) > 1) continue; // More than 1 bucket with more than 4 corners
 					if (Object.keys(intersectionCountBuckets).find((key) => key > 6)) continue; // Any bucket with more than 6 corners
+					if (countVerticalDirectionChanges(sequence) > 2) continue; // More than 2 changes in vertical direction
 
 					// Remove front-to-back duplicates
 					if (alreadyPresent.has(forwardSequence)) continue;
