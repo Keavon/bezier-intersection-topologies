@@ -14,44 +14,24 @@
 			}
 			#visualizerSvg {
 				border: 1px solid #ccc;
-				margin-bottom: 20px;
 				display: block; /* Prevents extra space below SVG */
 			}
 			#sequenceInput {
-				width: 300px;
+				width: 200px;
 				padding: 8px;
+				margin-bottom: 20px;
 				font-size: 16px;
 				box-sizing: border-box;
-			}
-			label {
-				margin-top: 20px;
-			}
-			#intersectionCountsContainer {
-				width: 80%;
-				max-width: 300px;
-				text-align: left;
-			}
-			#intersectionCountsContainer ul {
-				list-style-type: none;
-				padding-left: 0;
-			}
-			#intersectionCountsContainer li {
-				background-color: #f9f9f9;
-				border: 1px solid #eee;
-				padding: 8px;
-				margin-bottom: 5px;
-				font-size: 14px;
 			}
 		</style>
 	</head>
 	<body>
-		<svg id="visualizerSvg"></svg>
 		<input type="text" id="sequenceInput" placeholder="3 2 1 6 5 4 9 8 7" />
-		<div id="intersectionCountsContainer"></div>
+		<svg id="visualizerSvg"></svg>
 
 		<script>
 			const SVG_NS = "http://www.w3.org/2000/svg";
-			const SVG_WIDTH = 300;
+			const SVG_WIDTH = 200;
 			const SVG_PADDING_TOP = 40;
 			const SVG_PADDING_BOTTOM = 40;
 			const CENTER_X = SVG_WIDTH / 2;
@@ -442,39 +422,10 @@
 				return { drawingPositions, drawingDirections };
 			}
 
-			function displayIntersectionCounts(sequence) {
-				const countsElement = document.getElementById("intersectionCountsContainer");
-				countsElement.innerHTML = "";
-
-				if (!sequence || sequence.length < 2) return;
-
-				const bendList = [];
-
-				for (let i = 1; i < sequence.length; i++) {
-					const yPrev = sequence[i - 1];
-					const yCurr = sequence[i];
-					if (yPrev === yCurr) continue;
-
-					const count = countIntersectionsForArc(sequence, yPrev, yCurr);
-					const side = getSide(i - 1);
-
-					const li = document.createElement("li");
-					li.textContent = `${count} corners: ${side} side bend from ${yPrev} to ${yCurr}`;
-					bendList.push(li);
-				}
-
-				if (bendList.length > 0) {
-					const ul = document.createElement("ul");
-					bendList.forEach((li) => ul.appendChild(li));
-					countsElement.appendChild(ul);
-				}
-			}
-
 			function handleInputChange() {
 				const sequenceText = sequenceInput.value;
 				const sequence = parseSequence(sequenceText);
 				drawVisualization(sequence);
-				displayIntersectionCounts(sequence);
 			}
 
 			sequenceInput.addEventListener("input", handleInputChange);
