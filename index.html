@@ -532,17 +532,21 @@
 				const alreadyPresent = new Set();
 
 				for (const lineText of sequenceLines) {
-					const forwardSequence = lineText.trim();
-					if (forwardSequence === "") continue;
-					const reversedSequence = forwardSequence.split(" ").reverse().join(" ");
+					const lineTextTrimmed = lineText.trim();
+					if (lineTextTrimmed === "") continue;
 
-					const sequence = parseSequence(forwardSequence);
+					const forwardSequence = parseSequence(lineTextTrimmed);
+					const reversedSequence = [...forwardSequence].reverse();
+
+					const maxValue = Math.max(...forwardSequence);
+					const forwardFlippedSequence = forwardSequence.map((value) => maxValue - value + 1);
+					const reversedFlippedSequence = [...forwardFlippedSequence].reverse();
 
 					// Count the number of each quantity of corners
 					const intersectionCountBuckets = [];
 					let invalid = false;
-					sequence.slice(0, -1).forEach((_, i) => {
-						const count = countIntersectionsForArc(sequence, sequence[i], sequence[i + 1]);
+					forwardSequence.slice(0, -1).forEach((_, i) => {
+						const count = countIntersectionsForArc(forwardSequence, forwardSequence[i], forwardSequence[i + 1]);
 						if (count === undefined) {
 							invalid = true;
 							return;
@@ -556,27 +560,32 @@
 					// Filter out impossible cases for cubic Bezier intersections
 					if (entries.map(([a, b]) => a * b).reduce((a, b) => a + b, 0) > 24) continue; // More than 24 corners in total
 					if (intersectionCountBuckets.find((value) => value > 4)) continue; // Any bucket with more than 4 of the same number of corners
+					if ([2, 3, 5, 7, 8].map((i) => intersectionCountBuckets[i] || 0).reduce((a, b) => a + b, 0) > 4) continue; // More than 4 of the combined buckets for 2 and 3 corners
 					if (entries.flatMap(([key, value]) => (key > 4 ? value : 0)).reduce((a, b) => a + b, 0) > 1) continue; // More than 1 bucket with more than 4 corners
 					if (Object.keys(intersectionCountBuckets).find((key) => key > 6)) continue; // Any bucket with more than 6 corners
-					if (countVerticalDirectionChanges(sequence) > 2) continue; // More than 2 changes in vertical direction
+					if (countVerticalDirectionChanges(forwardSequence) > 2) continue; // More than 2 changes in vertical direction
 
-					// Remove front-to-back duplicates
-					if (alreadyPresent.has(forwardSequence)) continue;
-					if (alreadyPresent.has(reversedSequence)) continue;
-					alreadyPresent.add(forwardSequence);
-					alreadyPresent.add(reversedSequence);
+					// Remove front-to-back and top-to-bottom duplicates
+					const forwardSequenceString = forwardSequence.join(" ");
+					const reversedSequenceString = reversedSequence.join(" ");
+					if (alreadyPresent.has(forwardSequenceString)) continue;
+					if (alreadyPresent.has(reversedSequenceString)) continue;
+					alreadyPresent.add(forwardSequenceString);
+					alreadyPresent.add(reversedSequenceString);
+					alreadyPresent.add(forwardFlippedSequence.join(" "));
+					alreadyPresent.add(reversedFlippedSequence.join(" "));
 
 					const vizItemContainer = document.createElement("div");
 					vizItemContainer.className = "visualization-item";
 
 					const titleElement = document.createElement("p");
 					titleElement.className = "sequence-title";
-					titleElement.textContent = `${forwardSequence}\n${reversedSequence}`;
+					titleElement.textContent = `${forwardSequenceString}\n${reversedSequenceString}`;
 					vizItemContainer.appendChild(titleElement);
 
 					const currentSvgElement = document.createElementNS(SVG_NS, "svg");
 					// Add class for styling individual SVGs if needed, e.g., from .visualization-item svg
-					drawVisualization(sequence, currentSvgElement);
+					drawVisualization(forwardSequence, currentSvgElement);
 
 					vizItemContainer.appendChild(currentSvgElement);
 					visualizationsContainer.appendChild(vizItemContainer);
