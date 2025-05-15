@@ -12,24 +12,50 @@
 				align-items: center;
 				margin: 20px;
 			}
-			#visualizerSvg {
-				border: 1px solid #ccc;
-				display: block; /* Prevents extra space below SVG */
-			}
 			#sequenceInput {
-				width: 200px;
+				width: 400px;
+				resize: vertical;
+				min-height: 200px;
 				padding: 8px;
 				margin-bottom: 20px;
 				font-size: 16px;
+				font-family: monospace;
 				box-sizing: border-box;
+			}
+			#visualizationsContainer {
+				display: flex;
+				flex-wrap: wrap;
+				justify-content: center; /* Center items if they don't fill the row */
+				gap: 20px; /* Spacing between visualization items */
+				width: 100%;
+			}
+			.visualization-item {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				margin-bottom: 10px; /* Additional spacing below each item if needed */
+				white-space: pre;
+			}
+			.sequence-title {
+				margin-bottom: 5px;
+				font-weight: bold;
+				font-size: 14px;
+				text-align: center;
+			}
+			.visualization-item svg {
+				border: 1px solid #ccc;
+				display: block; /* Prevents extra space below SVG */
 			}
 		</style>
 	</head>
 	<body>
-		<input type="text" id="sequenceInput" placeholder="3 2 1 6 5 4 9 8 7" />
-		<svg id="visualizerSvg"></svg>
+		<textarea id="sequenceInput"></textarea>
+		<div id="visualizationsContainer"></div>
 
 		<script>
+			const PRELOAD_CASES = "./9-symmetric-open-meanders.txt";
+			// const PRELOAD_CASES = "./9-symmetric-semi-meanders.txt";
+
 			const SVG_NS = "http://www.w3.org/2000/svg";
 			const SVG_WIDTH = 200;
 			const SVG_PADDING_TOP = 40;
@@ -43,9 +69,10 @@
 			const CROSSING_ARROW_SIZE = 7;
 			const RIVER_END_EXTENSION_LENGTH = 60;
 			const RIVER_END_ARROW_SIZE = 6;
+			const BAIL_DEPTH = 100;
 
-			const svgElement = document.getElementById("visualizerSvg");
 			const sequenceInput = document.getElementById("sequenceInput");
+			const visualizationsContainer = document.getElementById("visualizationsContainer");
 
 			function createSvgElement(tag, attributes, tooltip) {
 				const el = document.createElementNS(SVG_NS, tag);
@@ -80,7 +107,7 @@
 				return arcStartingIndexInSequence % 2 === 0 ? "right" : "left";
 			}
 
-			function drawVisualization(sequence) {
+			function drawVisualization(sequence, svgElement) {
 				svgElement.innerHTML = ""; // Clear previous SVG content
 
 				if (!sequence || sequence.length === 0) {
@@ -114,25 +141,27 @@
 				// Draw Region Fills
 				if (sequence.length >= 2) {
 					for (let i = 0; i < sequence.length - 1; i++) {
-						let { drawingPositions, drawingDirections } = generateRegionFilledPaths(sequence, sequence[i], sequence[i + 1]);
+						const filledPaths = generateRegionFilledPaths(sequence, sequence[i], sequence[i + 1]);
+						if (!filledPaths) continue;
+						let { drawingPositions, drawingDirections } = filledPaths;
 						drawingPositions.push(drawingPositions[0]);
 						drawingDirections.push(drawingDirections[0]);
 						const intersectionCount = countIntersectionsForArc(sequence, sequence[i], sequence[i + 1]);
+						if (intersectionCount === undefined) continue;
 						const fillColor =
 							{
 								2: "yellow",
 								3: "orange",
 								4: "red",
+								5: "purple",
+								6: "blue",
 							}[intersectionCount] || "darkgray";
 
 						let startY = mapY(drawingPositions[0]);
-						let closeDirection = drawingDirections[0];
 						let pathData = `M ${CENTER_X},${startY}`;
-						if (intersectionCount === 6 && i === 2) console.log(`drawingPositions[0]: ${drawingPositions[0]}, startY: ${startY}`);
 
 						for (let j = 1; j < drawingPositions.length; j++) {
 							const nextY = mapY(drawingPositions[j]);
-							if (intersectionCount === 6 && i === 2) console.log(`drawingPositions[${j}]: ${drawingPositions[j]}, nextY: ${nextY}`);
 							const direction = drawingDirections[j];
 
 							const directionFlag = (j === drawingPositions.length - 1) !== (direction === "right") ? 1 : 0;
@@ -146,6 +175,7 @@
 							{
 								d: pathData,
 								fill: fillColor,
+								opacity: 0.25,
 								stroke: "none",
 							},
 							`${intersectionCount} corner region`
@@ -378,6 +408,8 @@
 						count += 1; // Count the bend
 						position = nextBendBottom; // Follow the bend to its bottom
 					}
+
+					if (position > BAIL_DEPTH) return undefined;
 				}
 
 				return count;
@@ -417,21 +449,74 @@
 						drawingPositions.push(position);
 						drawingDirections.push(nextBend.side); // Count the bend
 					}
+
+					if (position > BAIL_DEPTH) return undefined;
 				}
 
 				return { drawingPositions, drawingDirections };
 			}
 
 			function handleInputChange() {
-				const sequenceText = sequenceInput.value;
-				const sequence = parseSequence(sequenceText);
-				drawVisualization(sequence);
+				const allSequencesText = sequenceInput.value;
+				const sequenceLines = allSequencesText.split("\n");
+				visualizationsContainer.innerHTML = "";
+
+				for (const lineText of sequenceLines) {
+					const trimmedLine = lineText.trim();
+					if (trimmedLine === "") continue;
+
+					const sequence = parseSequence(trimmedLine);
+
+					const intersectionCountBuckets = [];
+					let invalid = false;
+					sequence.slice(0, -1).forEach((_, i) => {
+						const count = countIntersectionsForArc(sequence, sequence[i], sequence[i + 1]);
+						if (count === undefined) {
+							invalid = true;
+							return;
+						}
+						intersectionCountBuckets[count] = (intersectionCountBuckets[count] || 0) + 1;
+					});
+					if (invalid) continue;
+
+					const entries = Object.entries(intersectionCountBuckets);
+
+					// Filter out impossible cases for cubic Bezier intersections
+					if (entries.map(([a, b]) => a * b).reduce((a, b) => a + b, 0) > 24) continue; // More than 24 corners in total
+					if (intersectionCountBuckets.find((value) => value > 4)) continue; // Any bucket with more than 4 of the same number of corners
+					if (entries.flatMap(([key, value]) => (key > 4 ? value : 0)).reduce((a, b) => a + b, 0) > 1) continue; // More than 1 bucket with more than 4 corners
+					if (Object.keys(intersectionCountBuckets).find((key) => key > 6)) continue; // Any bucket with more than 6 corners
+
+					const vizItemContainer = document.createElement("div");
+					vizItemContainer.className = "visualization-item";
+
+					const titleElement = document.createElement("p");
+					titleElement.className = "sequence-title";
+					titleElement.textContent = `${trimmedLine}\n${trimmedLine.split(" ").reverse().join(" ")}`;
+					vizItemContainer.appendChild(titleElement);
+
+					const currentSvgElement = document.createElementNS(SVG_NS, "svg");
+					// Add class for styling individual SVGs if needed, e.g., from .visualization-item svg
+					drawVisualization(sequence, currentSvgElement);
+
+					vizItemContainer.appendChild(currentSvgElement);
+					visualizationsContainer.appendChild(vizItemContainer);
+				}
 			}
 
 			sequenceInput.addEventListener("input", handleInputChange);
 
-			sequenceInput.value = "3 2 1 6 5 4 9 8 7";
-			handleInputChange();
+			fetch(PRELOAD_CASES)
+				.then((response) => response.text())
+				.then((text) => {
+					sequenceInput.value = text
+						.split("\n")
+						.map((line) => line.trim())
+						.join("\n")
+						.trim();
+					handleInputChange();
+				})
+				.catch((error) => console.error("Error fetching the file:", error));
 		</script>
 	</body>
 </html>
