@@ -53,8 +53,10 @@
 		<div id="visualizationsContainer"></div>
 
 		<script>
-			const PRELOAD_CASES = "./9-symmetric-open-meanders.txt";
-			// const PRELOAD_CASES = "./9-symmetric-semi-meanders.txt";
+			const INTERSECTIONS = 9;
+			const ONLY_OPEN_MEANDERS = false;
+			const ONLY_SYMMETRIC = false;
+			const PRELOAD_CASES = `${ONLY_SYMMETRIC ? "symmetric-" : ""}${ONLY_OPEN_MEANDERS ? "open" : "semi"}-meanders/${INTERSECTIONS}.txt`;
 
 			const SVG_NS = "http://www.w3.org/2000/svg";
 			const SVG_WIDTH = 200;
@@ -461,12 +463,16 @@
 				const sequenceLines = allSequencesText.split("\n");
 				visualizationsContainer.innerHTML = "";
 
+				const alreadyPresent = new Set();
+
 				for (const lineText of sequenceLines) {
-					const trimmedLine = lineText.trim();
-					if (trimmedLine === "") continue;
+					const forwardSequence = lineText.trim();
+					if (forwardSequence === "") continue;
+					const reversedSequence = forwardSequence.split(" ").reverse().join(" ");
 
-					const sequence = parseSequence(trimmedLine);
+					const sequence = parseSequence(forwardSequence);
 
+					// Count the number of each quantity of corners
 					const intersectionCountBuckets = [];
 					let invalid = false;
 					sequence.slice(0, -1).forEach((_, i) => {
@@ -487,12 +493,18 @@
 					if (entries.flatMap(([key, value]) => (key > 4 ? value : 0)).reduce((a, b) => a + b, 0) > 1) continue; // More than 1 bucket with more than 4 corners
 					if (Object.keys(intersectionCountBuckets).find((key) => key > 6)) continue; // Any bucket with more than 6 corners
 
+					// Remove front-to-back duplicates
+					if (alreadyPresent.has(forwardSequence)) continue;
+					if (alreadyPresent.has(reversedSequence)) continue;
+					alreadyPresent.add(forwardSequence);
+					alreadyPresent.add(reversedSequence);
+
 					const vizItemContainer = document.createElement("div");
 					vizItemContainer.className = "visualization-item";
 
 					const titleElement = document.createElement("p");
 					titleElement.className = "sequence-title";
-					titleElement.textContent = `${trimmedLine}\n${trimmedLine.split(" ").reverse().join(" ")}`;
+					titleElement.textContent = `${forwardSequence}\n${reversedSequence}`;
 					vizItemContainer.appendChild(titleElement);
 
 					const currentSvgElement = document.createElementNS(SVG_NS, "svg");
